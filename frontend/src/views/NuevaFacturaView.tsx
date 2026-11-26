@@ -3,13 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import styled from 'styled-components/native';
 import BotonPrincipal from '../components/BotonPrincipal';
-import BuscadorRemoto from '../components/BuscadorRemoto';
 import CampoSelector from '../components/CampoSelector';
 import CampoTexto from '../components/CampoTexto';
 import ContenedorFormulario from '../components/ContenedorFormulario';
 import { Cargando, ErrorConReintento, EstadoVacio } from '../components/Estados';
 import LineaCarrito from '../components/LineaCarrito';
 import ResumenFactura from '../components/ResumenFactura';
+import SelectorBuscable from '../components/SelectorBuscable';
 import { cargarClientes } from '../controllers/clienteController';
 import { registrarFactura } from '../controllers/facturaController';
 import { cargarTarifasIva } from '../controllers/ivaController';
@@ -41,41 +41,6 @@ const Seccion = styled.Text`
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 8px 0 10px 2px;
-`;
-
-const TarjetaCliente = styled.View`
-  flex-direction: row;
-  align-items: center;
-  background-color: ${colores.primarioClaro};
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 14px;
-`;
-
-const TextosCliente = styled.View`
-  flex: 1;
-`;
-
-const NombreCliente = styled.Text`
-  font-size: 16px;
-  font-weight: bold;
-  color: ${colores.texto};
-`;
-
-const DetalleCliente = styled.Text`
-  font-size: 13px;
-  color: ${colores.textoSecundario};
-  margin-top: 2px;
-`;
-
-const Cambiar = styled.Pressable`
-  padding: 8px;
-`;
-
-const TextoCambiar = styled.Text`
-  font-size: 15px;
-  font-weight: bold;
-  color: ${colores.primario};
 `;
 
 const Aviso = styled.Text`
@@ -112,6 +77,10 @@ const claveCliente = (c: Cliente) => String(c.cli_id);
 const tituloCliente = (c: Cliente) => c.cli_nombres;
 const detalleCliente = (c: Cliente) => `Cédula: ${c.cli_cedula}`;
 
+const claveVendedor = (v: Vendedor) => String(v.vend_id);
+const tituloVendedor = (v: Vendedor) => v.vend_nombre;
+const detalleVendedor = (v: Vendedor) => `Código: ${v.vend_codigo}`;
+
 const claveProducto = (p: Producto) => String(p.produc_id);
 const tituloProducto = (p: Producto) => p.produc_nombre;
 const detalleProducto = (p: Producto) =>
@@ -126,13 +95,13 @@ const motivoBloqueo = (p: Producto): string | null => {
 
 export default function NuevaFacturaView({ navigation }: Props) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [vendedor, setVendedor] = useState<Vendedor | null>(null);
   const [lineas, setLineas] = useState<LineaEstado[]>([]);
   const [ivaId, setIvaId] = useState<number | null>(null);
-  const [vendId, setVendId] = useState<number | null>(null);
   const [descuento, setDescuento] = useState('');
 
   const [tarifas, setTarifas] = useState<Iva[]>([]);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [hayVendedores, setHayVendedores] = useState(true);
   const [cargandoCat, setCargandoCat] = useState(true);
   const [errorCat, setErrorCat] = useState<string | null>(null);
 
@@ -152,7 +121,7 @@ export default function NuevaFacturaView({ navigation }: Props) {
       setErrorCat(resVend.error.mensaje);
     } else {
       setTarifas(resIva.datos);
-      setVendedores(resVend.datos);
+      setHayVendedores(resVend.datos.length > 0);
       // Se preselecciona la tarifa general (15%); se puede cambiar.
       setIvaId((previo) => previo ?? resIva.datos.find((t) => Number(t.iva_valor) === 15)?.iva_id ?? null);
     }
@@ -232,7 +201,7 @@ export default function NuevaFacturaView({ navigation }: Props) {
 
     const resultado = await registrarFactura({
       clienteId: cliente?.cli_id ?? null,
-      vendedorId: vendId,
+      vendedorId: vendedor?.vend_id ?? null,
       ivaId,
       descuento,
       lineas: lineas.map((l) => ({
@@ -287,7 +256,7 @@ export default function NuevaFacturaView({ navigation }: Props) {
       />
     );
   }
-  if (vendedores.length === 0) {
+  if (!hayVendedores) {
     return (
       <EstadoVacio
         mensaje="No hay vendedores registrados"
@@ -299,46 +268,41 @@ export default function NuevaFacturaView({ navigation }: Props) {
   return (
     <ContenedorFormulario>
       <Seccion>Cliente</Seccion>
-      {cliente ? (
-        <TarjetaCliente>
-          <TextosCliente>
-            <NombreCliente numberOfLines={1}>{cliente.cli_nombres}</NombreCliente>
-            <DetalleCliente>Cédula: {cliente.cli_cedula}</DetalleCliente>
-          </TextosCliente>
-          <Cambiar onPress={() => setCliente(null)} disabled={guardando} accessibilityLabel="Cambiar cliente">
-            <TextoCambiar>Cambiar</TextoCambiar>
-          </Cambiar>
-        </TarjetaCliente>
-      ) : (
-        <BuscadorRemoto
-          etiqueta="Buscar cliente"
-          obligatorio
-          placeholder="Nombre o cédula..."
-          buscar={cargarClientes}
-          clave={claveCliente}
-          titulo={tituloCliente}
-          detalle={detalleCliente}
-          onElegir={(elegido) => {
-            setCliente(elegido);
-            quitarErrores('cli_id');
-          }}
-          error={errores.cli_id}
-        />
-      )}
+      <SelectorBuscable
+        etiqueta="Cliente"
+        obligatorio
+        placeholder="Selecciona el cliente"
+        valor={cliente}
+        cargar={cargarClientes}
+        clave={claveCliente}
+        titulo={tituloCliente}
+        detalle={detalleCliente}
+        onElegir={(elegido) => {
+          setCliente(elegido);
+          quitarErrores('cli_id');
+        }}
+        tituloVentana="Seleccionar cliente"
+        placeholderBuscar="Buscar por nombre o cédula..."
+        error={errores.cli_id}
+        deshabilitado={guardando}
+      />
 
       <Seccion>Productos</Seccion>
-      <BuscadorRemoto
-        etiqueta="Buscar producto"
+      <SelectorBuscable
+        etiqueta="Agregar producto"
         obligatorio
-        placeholder="Nombre o serie..."
-        buscar={cargarProductos}
+        placeholder="Selecciona un producto"
+        valor={null}
+        cargar={cargarProductos}
         clave={claveProducto}
         titulo={tituloProducto}
         detalle={detalleProducto}
         bloqueo={motivoBloqueo}
         onElegir={agregarProducto}
-        limpiarAlElegir
+        tituloVentana="Agregar producto"
+        placeholderBuscar="Buscar por nombre o serie..."
         error={errores.detalles}
+        deshabilitado={guardando}
       />
 
       {lineas.length === 0 ? (
@@ -394,17 +358,22 @@ export default function NuevaFacturaView({ navigation }: Props) {
         placeholder="0.00"
       />
 
-      <CampoSelector
+      <SelectorBuscable
         etiqueta="Vendedor"
         obligatorio
-        valor={vendId}
-        opciones={vendedores.map((v) => ({ valor: v.vend_id, etiqueta: v.vend_nombre }))}
-        onCambio={(valor) => {
-          setVendId(valor);
+        placeholder="Selecciona el vendedor"
+        valor={vendedor}
+        cargar={cargarVendedores}
+        clave={claveVendedor}
+        titulo={tituloVendedor}
+        detalle={detalleVendedor}
+        onElegir={(elegido) => {
+          setVendedor(elegido);
           quitarErrores('vend_id');
         }}
+        tituloVentana="Seleccionar vendedor"
+        placeholderBuscar="Buscar por nombre, código o correo..."
         error={errores.vend_id}
-        placeholder="Selecciona el vendedor"
         deshabilitado={guardando}
       />
 
