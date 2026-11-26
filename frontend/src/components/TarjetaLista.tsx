@@ -5,6 +5,10 @@ import { colores } from '../styles/comunes';
 interface Props {
   titulo: string;
   subtitulo?: string;
+  /** Segunda línea opcional (por ejemplo, el vencimiento de un producto). */
+  detalle?: string;
+  /** Pinta el detalle en rojo. */
+  detalleAlerta?: boolean;
   onPress?: () => void;
   onEditar?: () => void;
   onEliminar?: () => void;
@@ -37,17 +41,37 @@ const Subtitulo = styled.Text`
   margin-top: 2px;
 `;
 
+const Detalle = styled.Text<{ $alerta: boolean }>`
+  font-size: 13px;
+  font-weight: ${({ $alerta }) => ($alerta ? 'bold' : 'normal')};
+  color: ${({ $alerta }) => ($alerta ? colores.error : colores.textoSecundario)};
+  margin-top: 2px;
+`;
+
 const Accion = styled.Pressable`
   padding: 8px;
   margin-left: 4px;
 `;
 
-export default function TarjetaLista({ titulo, subtitulo, onPress, onEditar, onEliminar }: Props) {
+export default function TarjetaLista({
+  titulo,
+  subtitulo,
+  detalle,
+  detalleAlerta = false,
+  onPress,
+  onEditar,
+  onEliminar,
+}: Props) {
   return (
     <Tarjeta onPress={onPress}>
       <Textos>
         <Titulo numberOfLines={1}>{titulo}</Titulo>
         {!!subtitulo && <Subtitulo numberOfLines={1}>{subtitulo}</Subtitulo>}
+        {!!detalle && (
+          <Detalle numberOfLines={1} $alerta={detalleAlerta}>
+            {detalle}
+          </Detalle>
+        )}
       </Textos>
 
       {onEditar && (

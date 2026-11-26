@@ -1,8 +1,11 @@
+import { calcularTotales, subtotalDeLineas } from '../src/utils/calculos';
 import { esFechaValida, fechaLocalAISO, formatoFechaCorta } from '../src/utils/fechas';
 import { aCentavos, deCentavos, formatoDinero } from '../src/utils/formato';
 import {
+  filtrarCorreo,
   filtrarDecimal,
   filtrarDigitos,
+  filtrarFechaISO,
   filtrarLetras,
   limpiar,
   normalizarCorreo,
@@ -11,9 +14,11 @@ import {
   validarCorreo,
   validarFechaVencimiento,
   validarNombre,
+  validarPorcentaje,
   validarPrecio,
   validarTelefono,
   validarTextoObligatorio,
+  validarDescuento
 } from '../src/utils/validaciones';
 
 let total = 0;
@@ -129,6 +134,65 @@ probar('dinero cero', formatoDinero(0) === '$0.00');
 probar('dinero millones', formatoDinero('1234567.89') === '$1,234,567.89');
 probar('dinero inválido', formatoDinero('abc') === '$0.00');
 probar('dinero negativo', formatoDinero(-5.5) === '-$5.50');
+// Porcentaje de IVA
+probar('porcentaje 15', validarPorcentaje('15') === null);
+probar('porcentaje 8.5', validarPorcentaje('8.5') === null);
+probar('porcentaje 0', validarPorcentaje('0') === null);
+probar('porcentaje 100', validarPorcentaje('100') === null);
+probar('porcentaje 100.00', validarPorcentaje('100.00') === null);
+probar('porcentaje 100.01', contiene(validarPorcentaje('100.01'), 'entre 0 y 100'));
+probar('porcentaje 101', contiene(validarPorcentaje('101'), 'entre 0 y 100'));
+probar('porcentaje negativo', contiene(validarPorcentaje('-1'), 'número'));
+probar('porcentaje 3 decimales', contiene(validarPorcentaje('8.555'), 'máximo 2 decimales'));
+probar('porcentaje texto', contiene(validarPorcentaje('abc'), 'número'));
+probar('porcentaje punto final', validarPorcentaje('5.') !== null);
+probar('porcentaje sin entero', validarPorcentaje('.5') !== null);
+probar('porcentaje vacío', contiene(validarPorcentaje(''), 'Ingresa'));
+probar('porcentaje filtrado', filtrarDecimal('1234', 3, 2) === '123');
+
+// Filtro de correo
+probar('filtrarCorreo mayúsculas y espacios', filtrarCorreo(' Maria .Pena@Correo.COM ') === 'maria.pena@correo.com');
+probar('filtrarCorreo tabulador', filtrarCorreo('a b\tc') === 'abc');
+
+// Filtro de fecha AAAA-MM-DD
+probar('fechaISO completa', filtrarFechaISO('20271231') === '2027-12-31');
+probar('fechaISO ya con guiones', filtrarFechaISO('2027-12-31') === '2027-12-31');
+probar('fechaISO solo año', filtrarFechaISO('2027') === '2027');
+probar('fechaISO un dígito de mes', filtrarFechaISO('20271') === '2027-1');
+probar('fechaISO retroceso sobre el último dígito', filtrarFechaISO('2027-12-') === '2027-12');
+probar('fechaISO con barras y letras', filtrarFechaISO('2027/12/31abc') === '2027-12-31');
+probar('fechaISO exceso de dígitos', filtrarFechaISO('202712319999') === '2027-12-31');
+probar('fechaISO un dígito de día', filtrarFechaISO('2027123') === '2027-12-3');
+
+// Descuento
+probar('descuento vacío', validarDescuento('') === null);
+probar('descuento 0', validarDescuento('0') === null);
+probar('descuento 1.5', validarDescuento('1.5') === null);
+probar('descuento 3 decimales', contiene(validarDescuento('1.555'), 'máximo 2 decimales'));
+probar('descuento texto', contiene(validarDescuento('abc'), 'número'));
+probar('descuento punto final', validarDescuento('5.') !== null);
+probar('descuento negativo', validarDescuento('-1') !== null);
+probar('descuento enorme', contiene(validarDescuento('100000000'), '99999999.99'));
+
+// Totales (la misma fórmula que Laravel; los valores salen de las pruebas del backend)
+probar('subtotal de líneas', subtotalDeLineas([{ precio: '1.25', cantidad: 2 }, { precio: '2.50', cantidad: 1 }]) === 500);
+probar('totales 15% sin descuento: iva', calcularTotales(500, 0, 1500).iva === 75);
+probar('totales 15% sin descuento: total', calcularTotales(500, 0, 1500).total === 575);
+probar('totales 15% con descuento: iva', calcularTotales(500, 100, 1500).iva === 60);
+probar('totales 15% con descuento: total', calcularTotales(500, 100, 1500).total === 460);
+probar('totales 0%', calcularTotales(125, 25, 0).total === 100);
+probar('iva 0.1485 sube a 0.15', calcularTotales(99, 0, 1500).iva === 15);
+probar('total 0.99 + 0.15', calcularTotales(99, 0, 1500).total === 114);
+probar('iva 0.015 sube a 0.02', calcularTotales(10, 0, 1500).iva === 2);
+probar('iva 0.0495 baja a 0.05', calcularTotales(33, 0, 1500).iva === 5);
+probar('iva 0.1875 sube a 0.19', calcularTotales(125, 0, 1500).iva === 19);
+probar('iva 0.225 sube a 0.23', calcularTotales(150, 0, 1500).iva === 23);
+probar('total 2.50 - 1.00 + iva', calcularTotales(250, 100, 1500).total === 173);
+probar('descuento igual al subtotal', calcularTotales(125, 125, 1500).total === 0);
+probar('descuento mayor: no queda negativo', calcularTotales(100, 500, 1500).total === 0);
+probar('subtotal cero', calcularTotales(0, 0, 1500).total === 0);
+probar('iva 8.5%', calcularTotales(1000, 0, 850).iva === 85);
+probar('iva 19.99 al 15%', calcularTotales(1999, 0, 1500).iva === 300);
 
 console.log(`${total} pruebas, ${fallos} fallos`);
 if (fallos > 0) throw new Error('Hay pruebas fallidas');

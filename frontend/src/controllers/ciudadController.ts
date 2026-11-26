@@ -56,3 +56,13 @@ export async function eliminarCiudad(id: number): Promise<Resultado<null>> {
     return { ok: false, error: interpretarError(error) };
   }
 }
+
+/** Ciudades de una provincia: alimenta el selector en cascada. */
+export async function cargarCiudadesDeProvincia(provId: number): Promise<Resultado<Ciudad[]>> {
+  try {
+    const datos = await ciudadService.listar(undefined, provId);
+    return { ok: true, datos, mensaje: '' };
+  } catch (error) {
+    return { ok: false, error: interpretarError(error) };
+  }
+}

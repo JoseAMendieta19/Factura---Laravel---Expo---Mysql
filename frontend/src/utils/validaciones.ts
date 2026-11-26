@@ -149,3 +149,34 @@ export function validarFechaVencimiento(
   }
   return null;
 }
+
+/** Porcentaje de IVA: de 0 a 100, máximo 2 decimales. */
+export function validarPorcentaje(valor: string): Mensaje {
+  const v = limpiar(valor);
+  if (!v) return 'Ingresa el valor del IVA.';
+  if (!/^\d+(\.\d{1,2})?$/.test(v)) {
+    return 'El valor debe ser un número con máximo 2 decimales (por ejemplo, 15 o 8.5).';
+  }
+  if (Number(v) > 100) return 'El valor debe estar entre 0 y 100.';
+  return null;
+}
+
+/** Un correo no lleva espacios y se guarda en minúsculas: se corrige mientras se escribe. */
+export const filtrarCorreo = (texto: string): string => texto.replace(/\s/g, '').toLowerCase();
+
+/** Escribe la fecha como AAAA-MM-DD: deja solo dígitos (máximo 8) e inserta los guiones. */
+export function filtrarFechaISO(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 4) return d;
+  if (d.length <= 6) return `${d.slice(0, 4)}-${d.slice(4)}`;
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`;
+}
+
+/** Descuento en dinero: opcional (vacío = 0), máximo 2 decimales. Que no supere el subtotal lo comprueba el controlador. */
+export function validarDescuento(valor: string): Mensaje {
+  const v = limpiar(valor);
+  if (!v) return null;
+  if (!/^\d+(\.\d{1,2})?$/.test(v)) return 'El descuento debe ser un número con máximo 2 decimales.';
+  if (Number(v) > 99999999.99) return 'El descuento no puede ser mayor que 99999999.99.';
+  return null;
+}
