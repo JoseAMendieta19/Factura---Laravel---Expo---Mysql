@@ -7,6 +7,8 @@ interface Props {
   totales: Totales;
   /** Porcentaje de la tarifa elegida (15), o null si todavía no se eligió. */
   porcentaje: number | null;
+  /** La nota solo tiene sentido en la vista previa de una factura que aún no se registra. */
+  mostrarNota?: boolean;
 }
 
 const Caja = styled.View`
@@ -63,7 +65,7 @@ const Nota = styled.Text`
 
 const dinero = (centavos: number): string => formatoDinero(deCentavos(centavos));
 
-export default function ResumenFactura({ totales, porcentaje }: Props) {
+export default function ResumenFactura({ totales, porcentaje, mostrarNota = true }: Props) {
   return (
     <Caja>
       <Fila>
@@ -82,7 +84,11 @@ export default function ResumenFactura({ totales, porcentaje }: Props) {
         <EtiquetaTotal>Total</EtiquetaTotal>
         <ValorTotal>{dinero(totales.total)}</ValorTotal>
       </FilaTotal>
-      <Nota>El IVA se calcula sobre el subtotal menos el descuento. El total definitivo lo confirma el servidor.</Nota>
+      {mostrarNota && (
+        <Nota>
+          El IVA se calcula sobre el subtotal menos el descuento. El total definitivo lo confirma el servidor.
+        </Nota>
+      )}
     </Caja>
   );
 }

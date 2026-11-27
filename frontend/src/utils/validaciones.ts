@@ -180,3 +180,23 @@ export function validarDescuento(valor: string): Mensaje {
   if (Number(v) > 99999999.99) return 'El descuento no puede ser mayor que 99999999.99.';
   return null;
 }
+
+/** Filtro Desde/Hasta (las dos son opcionales). Vacía = sin filtro. */
+export function validarRangoFechas(desde: string, hasta: string): { desde: Mensaje; hasta: Mensaje } {
+  const d = limpiar(desde);
+  const h = limpiar(hasta);
+  const resultado: { desde: Mensaje; hasta: Mensaje } = { desde: null, hasta: null };
+
+  if (d && !esFechaValida(d)) {
+    resultado.desde = 'La fecha Desde debe ser una fecha real con el formato AAAA-MM-DD.';
+  }
+  if (h && !esFechaValida(h)) {
+    resultado.hasta = 'La fecha Hasta debe ser una fecha real con el formato AAAA-MM-DD.';
+  }
+  // Las fechas ISO se comparan como texto: "2026-11-24" < "2026-11-25".
+  if (!resultado.desde && !resultado.hasta && d && h && h < d) {
+    resultado.hasta = 'La fecha Hasta no puede ser anterior a la fecha Desde.';
+  }
+
+  return resultado;
+}

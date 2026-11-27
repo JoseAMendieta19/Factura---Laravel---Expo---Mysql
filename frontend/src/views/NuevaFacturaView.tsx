@@ -11,7 +11,7 @@ import LineaCarrito from '../components/LineaCarrito';
 import ResumenFactura from '../components/ResumenFactura';
 import SelectorBuscable from '../components/SelectorBuscable';
 import { cargarClientes } from '../controllers/clienteController';
-import { registrarFactura } from '../controllers/facturaController';
+import { compartirPdfFactura, registrarFactura } from '../controllers/facturaController';
 import { cargarTarifasIva } from '../controllers/ivaController';
 import { cargarProductos } from '../controllers/productoController';
 import { cargarVendedores } from '../controllers/vendedorController';
@@ -219,7 +219,23 @@ export default function NuevaFacturaView({ navigation }: Props) {
       Alert.alert(
         'Factura registrada',
         `Número: ${factura.fac_numero}\nTotal: ${formatoDinero(factura.fac_total)}`,
-        [{ text: 'Aceptar', onPress: () => navigation.goBack() }]
+        [
+          { text: 'Aceptar', onPress: () => navigation.goBack() },
+          {
+            text: 'Compartir PDF',
+            onPress: async () => {
+              // El botón Facturar sigue girando mientras se genera el PDF.
+              const pdf = await compartirPdfFactura(factura.fac_id);
+              if (!pdf.ok) {
+                Alert.alert(
+                  'No se pudo generar el PDF',
+                  `${pdf.error.mensaje}\n\nPuedes generarlo después desde el detalle de la factura.`
+                );
+              }
+              navigation.goBack();
+            },
+          },
+        ]
       );
       return;
     }

@@ -25,5 +25,7 @@ export type RootStackParamList = {
   ListaProductos: undefined;
   FormProducto: { producto?: Producto } | undefined;
   ListaFacturas: undefined;
+  // Se pasa el id y la pantalla pide la factura completa al servidor.
+  DetalleFactura: { facId: number };
   NuevaFactura: undefined;
 };

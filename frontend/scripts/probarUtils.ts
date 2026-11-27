@@ -18,8 +18,12 @@ import {
   validarPrecio,
   validarTelefono,
   validarTextoObligatorio,
-  validarDescuento
+  validarDescuento,
+  validarRangoFechas
 } from '../src/utils/validaciones';
+import type { Factura } from '../src/models/Factura';
+import { escaparHtml, nombreArchivoPdf, plantillaFacturaHtml } from '../src/utils/plantillaFactura';
+import { base64ABytes } from '../src/utils/base64';
 
 let total = 0;
 let fallos = 0;
@@ -193,6 +197,129 @@ probar('descuento mayor: no queda negativo', calcularTotales(100, 500, 1500).tot
 probar('subtotal cero', calcularTotales(0, 0, 1500).total === 0);
 probar('iva 8.5%', calcularTotales(1000, 0, 850).iva === 85);
 probar('iva 19.99 al 15%', calcularTotales(1999, 0, 1500).iva === 300);
+
+// Rango de fechas Desde/Hasta
+const sinErrorRango = (d: string, h: string): boolean => {
+  const r = validarRangoFechas(d, h);
+  return r.desde === null && r.hasta === null;
+};
+probar('rango vacío', sinErrorRango('', ''));
+probar('rango solo desde', sinErrorRango('2026-11-25', ''));
+probar('rango solo hasta', sinErrorRango('', '2026-11-25'));
+probar('rango válido', sinErrorRango('2026-11-24', '2026-11-26'));
+probar('rango mismo día', sinErrorRango('2026-11-25', '2026-11-25'));
+probar('rango con espacios', sinErrorRango(' 2026-11-24 ', ' 2026-11-26 '));
+probar('rango desde irreal', contiene(validarRangoFechas('2026-02-30', '').desde, 'fecha real'));
+probar('rango hasta con barras', contiene(validarRangoFechas('', '25/11/2026').hasta, 'AAAA-MM-DD'));
+probar('rango desde incompleta', validarRangoFechas('2026-11', '').desde !== null);
+probar('rango hasta anterior', contiene(validarRangoFechas('2026-11-25', '2026-11-24').hasta, 'anterior'));
+probar('rango hasta anterior no marca desde', validarRangoFechas('2026-11-25', '2026-11-24').desde === null);
+probar('rango irreal tapa la comparación', validarRangoFechas('2026-02-30', '2026-01-01').hasta === null);
+
+// Plantilla del PDF
+const facturaPrueba: Factura = {
+  fac_id: 1,
+  fac_numero: 'FAC-000001',
+  fac_fecha: '2026-11-25',
+  cli_id: 1,
+  vend_id: 1,
+  fac_subtotal: '5.00',
+  iva_id: 2,
+  fac_descuento: '0.00',
+  fac_total: '5.75',
+  iva_monto: '0.75',
+  cliente: {
+    cli_id: 1,
+    cli_cedula: '1300000005',
+    cli_nombres: 'Cliente Factura',
+    cli_correo: 'cliente.fac@correo.com',
+    cli_telefono: '0991234567',
+    cli_direccion: 'Av. Principal',
+  },
+  vendedor: { vend_id: 1, vend_nombre: 'Vendedor Factura', vend_codigo: 'VF01' },
+  iva: { iva_id: 2, iva_nombre: 'IVA 15%', iva_valor: '15.00' },
+  detalles: [
+    {
+      det_fac_id: 1,
+      fac_id: 1,
+      produc_id: 1,
+      det_fac_cant: 2,
+      det_fac_precio_unitario: '1.25',
+      det_fac_total: '2.50',
+      producto: { produc_id: 1, produc_serie: 'FT-001', produc_nombre: 'Café <Premium> & Co' },
+    },
+    {
+      det_fac_id: 2,
+      fac_id: 1,
+      produc_id: 2,
+      det_fac_cant: 1,
+      det_fac_precio_unitario: '2.50',
+      det_fac_total: '2.50',
+      producto: { produc_id: 2, produc_serie: 'FT-002', produc_nombre: 'Aceite 1L' },
+    },
+  ],
+};
+const htmlPrueba = plantillaFacturaHtml(facturaPrueba);
+
+probar('escapar caracteres', escaparHtml('<b>&"\'') === '&lt;b&gt;&amp;&quot;&#39;');
+probar('pdf número', htmlPrueba.includes('FAC-000001'));
+probar('pdf fecha', htmlPrueba.includes('25/11/2026'));
+probar('pdf cliente', htmlPrueba.includes('Cliente Factura') && htmlPrueba.includes('1300000005'));
+probar('pdf vendedor', htmlPrueba.includes('Vendedor Factura') && htmlPrueba.includes('VF01'));
+probar('pdf producto escapado', htmlPrueba.includes('Café &lt;Premium&gt; &amp; Co'));
+probar('pdf producto sin etiqueta cruda', !htmlPrueba.includes('<Premium>'));
+probar('pdf línea unitario', htmlPrueba.includes('$1.25'));
+probar('pdf subtotal', htmlPrueba.includes('$5.00'));
+probar('pdf iva', htmlPrueba.includes('IVA (15%)') && htmlPrueba.includes('$0.75'));
+probar('pdf total', htmlPrueba.includes('$5.75'));
+probar('pdf descuento cero', htmlPrueba.includes('$0.00') && !htmlPrueba.includes('-$0.00'));
+probar(
+  'pdf descuento con signo',
+  plantillaFacturaHtml({ ...facturaPrueba, fac_descuento: '1.00' }).includes('-$1.00')
+);
+probar(
+  'pdf sin detalles',
+  plantillaFacturaHtml({ ...facturaPrueba, detalles: undefined }).includes('FAC-000001')
+);
+probar(
+  'pdf sin cliente',
+  plantillaFacturaHtml({ ...facturaPrueba, cliente: undefined }).includes('Sin datos del cliente')
+);
+probar(
+  'pdf nombre malicioso',
+  !plantillaFacturaHtml({
+    ...facturaPrueba,
+    cliente: { cli_id: 1, cli_cedula: '1', cli_nombres: '<script>alert(1)</script>' },
+  }).includes('<script>')
+);
+
+// Base64 a bytes (ida y vuelta con btoa, de 0 a 12 bytes para cubrir todos los rellenos)
+for (let n = 0; n <= 12; n++) {
+  const originales = Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
+  const decodificados = base64ABytes(btoa(String.fromCharCode(...originales)));
+  probar(
+    `base64 ida y vuelta (${n} bytes)`,
+    decodificados.length === n && decodificados.every((b, i) => b === originales[i])
+  );
+}
+const grandes = Uint8Array.from({ length: 5000 }, (_, i) => (i * 7) % 256);
+const grandesDecodificados = base64ABytes(btoa(String.fromCharCode(...grandes)));
+probar(
+  'base64 ida y vuelta (5000 bytes)',
+  grandesDecodificados.length === 5000 && grandesDecodificados.every((b, i) => b === grandes[i])
+);
+probar('base64 Man', base64ABytes('TWFu').join(',') === '77,97,110');
+probar('base64 con relleno', base64ABytes('TWE=').join(',') === '77,97');
+probar('base64 con doble relleno', base64ABytes('TQ==').join(',') === '77');
+probar('base64 con espacios y saltos', base64ABytes('TW\n Fu ').join(',') === '77,97,110');
+probar('base64 vacío', base64ABytes('').length === 0);
+
+// Nombre del archivo PDF
+probar('nombre de archivo', nombreArchivoPdf(facturaPrueba) === 'FAC-000001.pdf');
+probar(
+  'nombre de archivo con caracteres raros',
+  nombreArchivoPdf({ ...facturaPrueba, fac_numero: 'FA/C 1:2' }) === 'FA_C_1_2.pdf'
+);
 
 console.log(`${total} pruebas, ${fallos} fallos`);
 if (fallos > 0) throw new Error('Hay pruebas fallidas');

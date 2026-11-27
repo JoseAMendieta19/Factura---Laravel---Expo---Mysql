@@ -1,11 +1,13 @@
-import type { Factura, FacturaPayload } from '../models/Factura';
+import type { Factura, FacturaPayload, ListadoFacturas } from '../models/Factura';
 import { facturaService } from '../services/facturaService';
 import { subtotalDeLineas } from '../utils/calculos';
 import { interpretarError, type ErrorApi } from '../utils/errores';
 import { hoyISO } from '../utils/fechas';
 import { aCentavos, deCentavos } from '../utils/formato';
 import { erroresDeValidacion, type Resultado } from '../utils/resultado';
-import { limpiar, validarDescuento } from '../utils/validaciones';
+import { limpiar, validarDescuento, validarRangoFechas } from '../utils/validaciones';
+import { pdfService } from '../services/pdfService';
+import { nombreArchivoPdf, plantillaFacturaHtml } from '../utils/plantillaFactura';
 
 export interface LineaFacturaForm {
   produc_id: number;
@@ -23,12 +25,44 @@ export interface FacturaForm {
   lineas: LineaFacturaForm[];
 }
 
+export interface FiltrosFacturas {
+  buscar: string;
+  desde: string;
+  hasta: string;
+}
+
 // Solo existe para que TypeScript sepa que cliente, vendedor e IVA no son null más abajo.
 const ERROR_FACTURA: ErrorApi = {
   tipo: 'validacion',
   mensaje: 'Revisa los campos marcados en rojo.',
   errores: {},
 };
+
+export async function cargarFacturas(filtros: FiltrosFacturas): Promise<Resultado<ListadoFacturas>> {
+  const desde = limpiar(filtros.desde);
+  const hasta = limpiar(filtros.hasta);
+
+  // Si el rango de fechas no es válido, ni siquiera se consulta al servidor.
+  const rango = validarRangoFechas(desde, hasta);
+  const invalido = erroresDeValidacion({ desde: rango.desde, hasta: rango.hasta });
+  if (invalido) return { ok: false, error: invalido };
+
+  try {
+    const datos = await facturaService.listar({ buscar: limpiar(filtros.buscar), desde, hasta });
+    return { ok: true, datos, mensaje: '' };
+  } catch (error) {
+    return { ok: false, error: interpretarError(error) };
+  }
+}
+
+export async function obtenerFactura(id: number): Promise<Resultado<Factura>> {
+  try {
+    const datos = await facturaService.obtener(id);
+    return { ok: true, datos, mensaje: '' };
+  } catch (error) {
+    return { ok: false, error: interpretarError(error) };
+  }
+}
 
 export async function registrarFactura(form: FacturaForm): Promise<Resultado<Factura>> {
   const descuento = limpiar(form.descuento);
@@ -76,5 +110,37 @@ export async function registrarFactura(form: FacturaForm): Promise<Resultado<Fac
     return { ok: true, datos: respuesta.data, mensaje: respuesta.message };
   } catch (error) {
     return { ok: false, error: interpretarError(error) };
+  }
+}
+
+/** Pide la factura completa al servidor, arma el PDF y abre el menú de compartir. */
+export async function compartirPdfFactura(facId: number): Promise<Resultado<null>> {
+  // 1. Se piden los datos completos al servidor (no se usan copias viejas de la pantalla).
+  const detalle = await obtenerFactura(facId);
+  if (!detalle.ok) return detalle;
+
+  // 2. Se arma el HTML, se convierte en PDF y se comparte.
+  try {
+        await pdfService.generarYCompartir(plantillaFacturaHtml(detalle.datos), nombreArchivoPdf(detalle.datos));
+    return { ok: true, datos: null, mensaje: '' };
+
+  } catch (error) {
+    const sinCompartir = error instanceof Error && error.message === 'COMPARTIR_NO_DISPONIBLE';
+    const detalleTecnico = error instanceof Error ? error.message : String(error);
+    console.warn('Error al generar el PDF:', error);
+
+    const base = sinCompartir
+      ? 'Este dispositivo no permite compartir archivos.'
+      : 'No se pudo generar el PDF. Intenta nuevamente.';
+
+    return {
+      ok: false,
+      error: {
+        tipo: 'desconocido',
+        // El detalle técnico solo aparece mientras desarrollas (no en una app publicada).
+        mensaje: __DEV__ ? `${base}\n\nDetalle técnico: ${detalleTecnico}` : base,
+        errores: {},
+      },
+    };
   }
 }

@@ -7,7 +7,16 @@ import type { RootStackParamList } from '../navigation/tipos';
 import { colores } from '../styles/comunes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Menu'>;
-type Ruta = Exclude<keyof RootStackParamList, 'Menu'>;
+type Ruta =
+  | 'ListaProvincias'
+  | 'ListaCiudades'
+  | 'ListaIva'
+  | 'ListaClientes'
+  | 'ListaVendedores'
+  | 'ListaProveedores'
+  | 'ListaProductos'
+  | 'NuevaFactura'
+  | 'ListaFacturas';
 
 interface Opcion {
   ruta: Ruta;

@@ -23,10 +23,29 @@ export interface Factura {
   fac_total: string;
   // Calculado por la API: total - subtotal + descuento.
   iva_monto: string;
-  cliente?: { cli_id: number; cli_cedula: string; cli_nombres: string };
-  vendedor?: { vend_id: number; vend_nombre: string };
+  // En el listado vienen solo cédula y nombre; el detalle trae además los datos de contacto.
+  cliente?: {
+    cli_id: number;
+    cli_cedula: string;
+    cli_nombres: string;
+    cli_correo?: string;
+    cli_telefono?: string;
+    cli_direccion?: string;
+  };
+  vendedor?: { vend_id: number; vend_nombre: string; vend_codigo?: string };
   iva?: Iva;
   detalles?: DetalleFactura[];
+}
+
+// Cantidad y suma de las facturas que cumplen el filtro (lo calcula la API).
+export interface ResumenFacturas {
+  cantidad: number;
+  total: string;
+}
+
+export interface ListadoFacturas {
+  facturas: Factura[];
+  resumen: ResumenFacturas;
 }
 
 // Lo que se envía al servidor: solo qué se vende y a quién. Los precios y totales los calcula Laravel.

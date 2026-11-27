@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colores } from '../styles/comunes';
+import DetalleFacturaView from '../views/DetalleFacturaView';
 import FormCiudadView from '../views/FormCiudadView';
 import FormClienteView from '../views/FormClienteView';
 import FormIvaView from '../views/FormIvaView';
@@ -10,6 +11,7 @@ import FormProvinciaView from '../views/FormProvinciaView';
 import FormVendedorView from '../views/FormVendedorView';
 import ListaCiudadesView from '../views/ListaCiudadesView';
 import ListaClientesView from '../views/ListaClientesView';
+import ListaFacturasView from '../views/ListaFacturasView';
 import ListaIvaView from '../views/ListaIvaView';
 import ListaProductosView from '../views/ListaProductosView';
 import ListaProveedoresView from '../views/ListaProveedoresView';
@@ -17,7 +19,6 @@ import ListaProvinciasView from '../views/ListaProvinciasView';
 import ListaVendedoresView from '../views/ListaVendedoresView';
 import MenuView from '../views/MenuView';
 import NuevaFacturaView from '../views/NuevaFacturaView';
-import PantallaProximamente from '../views/PantallaProximamente';
 import type { RootStackParamList } from './tipos';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -101,9 +102,8 @@ export default function AppNavigator() {
         />
 
         <Stack.Screen name="NuevaFactura" component={NuevaFacturaView} options={{ title: 'Nueva factura' }} />
-
-        {/* Pantalla provisional: se reemplaza en el Paso 16.2. */}
-        <Stack.Screen name="ListaFacturas" component={PantallaProximamente} options={{ title: 'Facturas' }} />
+        <Stack.Screen name="ListaFacturas" component={ListaFacturasView} options={{ title: 'Facturas' }} />
+        <Stack.Screen name="DetalleFactura" component={DetalleFacturaView} options={{ title: 'Detalle de factura' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
