@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import styled from 'styled-components/native';
 import BotonPrincipal from '../components/BotonPrincipal';
+import CampoFecha from '../components/CampoFecha';
 import CampoSelector from '../components/CampoSelector';
 import CampoTexto from '../components/CampoTexto';
 import ContenedorFormulario from '../components/ContenedorFormulario';
@@ -11,7 +12,9 @@ import { guardarProducto } from '../controllers/productoController';
 import { cargarProveedores } from '../controllers/proveedorController';
 import type { Proveedor } from '../models/Proveedor';
 import type { RootStackParamList } from '../navigation/tipos';
-import { filtrarDecimal, filtrarDigitos, filtrarFechaISO } from '../utils/validaciones';
+import { hoyISO } from '../utils/fechas';
+import { filtrarDecimal, filtrarDigitos } from '../utils/validaciones';
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FormProducto'>;
 type Errores = Record<string, string | null | undefined>;
@@ -154,19 +157,18 @@ export default function FormProductoView({ navigation, route }: Props) {
         maxLength={11}
         placeholder="Ej. 2.50"
       />
-      <CampoTexto
+            {/* Al crear no puede ser pasada; al editar sí (un producto ya vencido debe poder corregirse). */}
+      <CampoFecha
         etiqueta="Fecha de vencimiento"
         obligatorio
         valor={fecha}
-        onCambio={(texto) => {
-          setFecha(texto);
+        onCambio={(iso) => {
+          setFecha(iso);
           quitarError('produc_fecha_venci');
         }}
         error={errores.produc_fecha_venci}
-        filtro={filtrarFechaISO}
-        keyboardType="number-pad"
-        maxLength={10}
-        placeholder="AAAA-MM-DD"
+        minimo={producto ? undefined : hoyISO()}
+        deshabilitado={guardando}
       />
       <CampoSelector
         etiqueta="Proveedor"

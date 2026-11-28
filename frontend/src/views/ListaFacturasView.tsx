@@ -5,16 +5,15 @@ import { FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import styled from 'styled-components/native';
 import Buscador from '../components/Buscador';
-import CampoTexto from '../components/CampoTexto';
+import CampoFecha from '../components/CampoFecha';
 import { Cargando, ErrorConReintento, EstadoVacio } from '../components/Estados';
 import TarjetaLista from '../components/TarjetaLista';
 import { cargarFacturas, type FiltrosFacturas } from '../controllers/facturaController';
 import type { Factura, ResumenFacturas } from '../models/Factura';
 import type { RootStackParamList } from '../navigation/tipos';
 import { colores } from '../styles/comunes';
-import { formatoFechaCorta } from '../utils/fechas';
+import { formatoFechaCorta, hoyISO } from '../utils/fechas';
 import { formatoDinero } from '../utils/formato';
-import { filtrarFechaISO, validarRangoFechas } from '../utils/validaciones';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ListaFacturas'>;
 
@@ -80,12 +79,7 @@ export default function ListaFacturasView({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const peticion = useRef(0);
-
-  // Las fechas solo se aplican cuando están completas (10 caracteres) y son válidas.
-  // Mientras se escribe una fecha a medias, la lista no cambia.
-  const errorFechas = validarRangoFechas(desde, hasta);
-  const desdeAplicada = desde.length === 10 && !errorFechas.desde ? desde : '';
-  const hastaAplicada = hasta.length === 10 && !errorFechas.hasta ? hasta : '';
+  const hoy = hoyISO();
 
   const cargar = useCallback(async (filtros: FiltrosFacturas, modo: 'normal' | 'refrescar' = 'normal') => {
     const numero = ++peticion.current;
@@ -118,19 +112,16 @@ export default function ListaFacturasView({ navigation }: Props) {
   // Se ejecuta al entrar a la pantalla (así aparece la factura recién creada) y cuando cambia algún filtro.
   useFocusEffect(
     useCallback(() => {
-      cargar({ buscar: consulta, desde: desdeAplicada, hasta: hastaAplicada });
-    }, [cargar, consulta, desdeAplicada, hastaAplicada])
+      cargar({ buscar: consulta, desde, hasta });
+    }, [cargar, consulta, desde, hasta])
   );
 
-  const hayFiltros = consulta !== '' || desdeAplicada !== '' || hastaAplicada !== '';
+  const hayFiltros = consulta !== '' || desde !== '' || hasta !== '';
 
   let contenido;
   if (error) {
     contenido = (
-      <ErrorConReintento
-        mensaje={error}
-        onReintentar={() => cargar({ buscar: consulta, desde: desdeAplicada, hasta: hastaAplicada })}
-      />
+      <ErrorConReintento mensaje={error} onReintentar={() => cargar({ buscar: consulta, desde, hasta })} />
     );
   } else if (cargando && facturas.length === 0) {
     contenido = <Cargando />;
@@ -149,9 +140,7 @@ export default function ListaFacturasView({ navigation }: Props) {
         )}
         contentContainerStyle={{ padding: 16, paddingBottom: 24 + insets.bottom, flexGrow: 1 }}
         refreshing={refrescando}
-        onRefresh={() =>
-          cargar({ buscar: consulta, desde: desdeAplicada, hasta: hastaAplicada }, 'refrescar')
-        }
+        onRefresh={() => cargar({ buscar: consulta, desde, hasta }, 'refrescar')}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           hayFiltros ? (
@@ -177,27 +166,22 @@ export default function ListaFacturasView({ navigation }: Props) {
 
         <FilaFechas>
           <ColumnaFecha>
-            <CampoTexto
+            <CampoFecha
               etiqueta="Desde"
               valor={desde}
               onCambio={setDesde}
-              error={desde.length === 10 ? errorFechas.desde : null}
-              filtro={filtrarFechaISO}
-              keyboardType="number-pad"
-              maxLength={10}
-              placeholder="AAAA-MM-DD"
+              maximo={hasta || hoy}
+              permitirBorrar
             />
           </ColumnaFecha>
           <ColumnaFecha>
-            <CampoTexto
+            <CampoFecha
               etiqueta="Hasta"
               valor={hasta}
               onCambio={setHasta}
-              error={hasta.length === 10 ? errorFechas.hasta : null}
-              filtro={filtrarFechaISO}
-              keyboardType="number-pad"
-              maxLength={10}
-              placeholder="AAAA-MM-DD"
+              minimo={desde || undefined}
+              maximo={hoy}
+              permitirBorrar
             />
           </ColumnaFecha>
         </FilaFechas>

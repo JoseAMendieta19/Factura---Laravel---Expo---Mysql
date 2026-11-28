@@ -24,6 +24,19 @@ import {
 import type { Factura } from '../src/models/Factura';
 import { escaparHtml, nombreArchivoPdf, plantillaFacturaHtml } from '../src/utils/plantillaFactura';
 import { base64ABytes } from '../src/utils/base64';
+import {
+  ENCABEZADO_SEMANA,
+  NOMBRES_MESES,
+  aISO,
+  construirMes,
+  desglosarISO,
+  diaDeshabilitado,
+  diasEnMes,
+  mesAccesible,
+  mesInicial,
+  moverMes,
+  primerDiaSemana,
+} from '../src/utils/calendario';
 
 let total = 0;
 let fallos = 0;
@@ -321,5 +334,67 @@ probar(
   nombreArchivoPdf({ ...facturaPrueba, fac_numero: 'FA/C 1:2' }) === 'FA_C_1_2.pdf'
 );
 
+// Calendario: días y columnas
+probar('nombres de meses', NOMBRES_MESES.length === 12 && NOMBRES_MESES[0] === 'Enero' && NOMBRES_MESES[11] === 'Diciembre');
+probar('encabezado de semana', ENCABEZADO_SEMANA.length === 7 && ENCABEZADO_SEMANA[0] === 'Lu' && ENCABEZADO_SEMANA[6] === 'Do');
+probar('días de enero', diasEnMes(2026, 1) === 31);
+probar('días de febrero normal', diasEnMes(2026, 2) === 28);
+probar('días de febrero bisiesto', diasEnMes(2028, 2) === 29);
+probar('febrero 2000 bisiesto', diasEnMes(2000, 2) === 29);
+probar('febrero 2100 no bisiesto', diasEnMes(2100, 2) === 28);
+probar('días de abril', diasEnMes(2026, 4) === 30);
+probar('días de noviembre', diasEnMes(2026, 11) === 30);
+probar('días de diciembre', diasEnMes(2026, 12) === 31);
+probar('1 nov 2026 es domingo', primerDiaSemana(2026, 11) === 6);
+probar('1 ene 2026 es jueves', primerDiaSemana(2026, 1) === 3);
+probar('1 dic 2026 es martes', primerDiaSemana(2026, 12) === 1);
+probar('1 feb 2027 es lunes', primerDiaSemana(2027, 2) === 0);
+
+// Calendario: cuadrícula
+const nov2026 = construirMes(2026, 11);
+probar('mes siempre en 6 filas de 7', nov2026.length === 6 && nov2026.every((f) => f.length === 7));
+probar('nov 2026: primera fila', nov2026[0].slice(0, 6).every((c) => c === null) && nov2026[0][6] === 1);
+probar('nov 2026: 30 días', nov2026.flat().filter((c) => c !== null).length === 30);
+probar('nov 2026: el 30 cae en la fila 6, columna lunes', nov2026[5][0] === 30);
+const feb2027 = construirMes(2027, 2);
+probar('feb 2027: 6 filas', feb2027.length === 6);
+probar('feb 2027: empieza en lunes', feb2027[0][0] === 1);
+probar('feb 2027: el 28 cierra la fila 4', feb2027[3][6] === 28 && feb2027[4].every((c) => c === null));
+probar('feb 2028: 29 días', construirMes(2028, 2).flat().filter((c) => c !== null).length === 29);
+
+// Calendario: fechas y movimiento entre meses
+probar('aISO con ceros', aISO(2026, 1, 5) === '2026-01-05');
+probar('aISO de diciembre', aISO(2026, 12, 31) === '2026-12-31');
+probar('moverMes: dic + 1', moverMes(2026, 12, 1).anio === 2027 && moverMes(2026, 12, 1).mes === 1);
+probar('moverMes: ene - 1', moverMes(2026, 1, -1).anio === 2025 && moverMes(2026, 1, -1).mes === 12);
+probar('moverMes: + 12', moverMes(2026, 11, 12).anio === 2027 && moverMes(2026, 11, 12).mes === 11);
+probar('moverMes: - 12', moverMes(2026, 11, -12).anio === 2025 && moverMes(2026, 11, -12).mes === 11);
+probar('moverMes: + 14', moverMes(2026, 11, 14).anio === 2028 && moverMes(2026, 11, 14).mes === 1);
+probar('desglosar válida', JSON.stringify(desglosarISO('2026-11-26')) === JSON.stringify({ anio: 2026, mes: 11, dia: 26 }));
+probar('desglosar irreal', desglosarISO('2026-02-30') === null);
+probar('desglosar vacía', desglosarISO('') === null);
+
+// Calendario: límites
+probar('día antes del mínimo', diaDeshabilitado('2026-11-25', '2026-11-26', undefined));
+probar('día igual al mínimo', !diaDeshabilitado('2026-11-26', '2026-11-26', undefined));
+probar('día después del máximo', diaDeshabilitado('2026-11-27', undefined, '2026-11-26'));
+probar('día igual al máximo', !diaDeshabilitado('2026-11-26', undefined, '2026-11-26'));
+probar('día sin límites', !diaDeshabilitado('2026-11-26'));
+probar('mes del mínimo accesible', mesAccesible(2026, 11, '2026-11-26', undefined));
+probar('mes anterior al mínimo no accesible', !mesAccesible(2026, 10, '2026-11-26', undefined));
+probar('mes del máximo accesible', mesAccesible(2026, 11, undefined, '2026-11-30'));
+probar('mes posterior al máximo no accesible', !mesAccesible(2026, 12, undefined, '2026-11-30'));
+probar('años fuera de rango', !mesAccesible(1899, 12) && !mesAccesible(2101, 1));
+
+// Calendario: mes que se muestra al abrir
+const inicial = (valor: string, min?: string, max?: string) => mesInicial(valor, min, max, '2026-11-26');
+probar('mes inicial con valor', inicial('2027-12-31').anio === 2027 && inicial('2027-12-31').mes === 12);
+probar('mes inicial sin valor: hoy', inicial('').anio === 2026 && inicial('').mes === 11);
+probar('mes inicial con mínimo futuro', inicial('', '2026-12-05').anio === 2026 && inicial('', '2026-12-05').mes === 12);
+probar('mes inicial con máximo pasado', inicial('', undefined, '2026-10-15').mes === 10);
+probar('mes inicial con valor irreal: hoy', inicial('2026-02-30').anio === 2026 && inicial('2026-02-30').mes === 11);
+probar('mes inicial con valor fuera del mínimo', inicial('2020-01-15', '2026-11-26').anio === 2026 && inicial('2020-01-15', '2026-11-26').mes === 11);
+
 console.log(`${total} pruebas, ${fallos} fallos`);
 if (fallos > 0) throw new Error('Hay pruebas fallidas');
+
